@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4
+# vim: number tabstop=4 noexpandtab shiftwidth=4 softtabstop=4 autoindent
 
 """
 radiorec.py – Recording internet radio streams
@@ -54,9 +54,10 @@ def read_settings():
 		print('Please copy/create the settings file to/in the appropriate location.')
 		sys.exit()
 	return dict(config.items())
+
 # -----------------------------------------------------------
 # record_worker
-#
+# Thread-Procedur
 # -----------------------------------------------------------
 def record_worker(stoprec, streamurl, target_dir, args):
 
@@ -64,9 +65,11 @@ def record_worker(stoprec, streamurl, target_dir, args):
 	filename = target_dir + os.sep + cur_dt_string + "_" + args.station
 	if args.name:
 		filename += '_' + args.name
+	description = filename + '.txt'
+	fo = open(description, "w")
+	fo.write('Recording time: ' + cur_dt_string)
 
-
-
+	verboseprint(streamurl)
 	# now, with the below headers, we defined ourselves as a simpleton who is
 	# still using internet explorer.
 	headers = {}
@@ -90,13 +93,14 @@ def record_worker(stoprec, streamurl, target_dir, args):
 	else:
 		print('Unknown content type "' + content_type + '". Assuming mp3.')
 		filename += '.mp3'
-
+	verboseprint('Write stream to ' + filename)
 	verboseprint(conn.info())
+	fo.write(str(conn.info()))
 ##	print(conn.geturl());
 	verboseprint('HTTP status code: ' + str(conn.getcode()));
 
 	metaint = conn.getheader('icy-metaint')
-	print("icy metaint: " + str(metaint))
+	verboseprint('icy metaint: ' + str(metaint))
 	read_length = int(metaint) + 255
 
 	with open(filename, "wb") as target:
@@ -106,6 +110,7 @@ def record_worker(stoprec, streamurl, target_dir, args):
 					 stat.S_IROTH | stat.S_IWOTH)
 		verboseprint('Recording ' + args.station + '...')
 		while(not stoprec.is_set() and not conn.closed):
+			# read stream from URL and write to file
 			## target.write(conn.read(1024))
 			target.write(conn.read(read_length))
 
@@ -117,6 +122,7 @@ def record(args):
 
 	try:
 		streamurl = settings['STATIONS'][args.station]
+		print(streamurl)
 	except KeyError:
 		print('Unkown station name: ' + args.station)
 		sys.exit()
@@ -124,10 +130,24 @@ def record(args):
 		verboseprint('Seems to be an M3U playlist. Trying to parse...')
 		with urllib.request.urlopen(streamurl) as remotefile:
 			for line in remotefile:
-				if not line.decode('utf-8').startswith('#'):
-					tmpstr = line.decode('utf-8')
+				linestr = line.decode('utf-8')
+				if linestr.startswith('#'):
+					if linestr.startswith('#EXTM3U'):
+						print("Extended M3U-Header")
+					if linestr.startswith('#EXTINF'):
+						print(linestr)
+					continue
+				# Ignore empty lines
+				if linestr.startswith('\n'):
+					continue
+				# is this line a URL for streaming
+				if 'http' in linestr:
+					print("Found URL for streaming")
+					streamurl = linestr
+					print("[" + streamurl.replace('\n','') + "]")
 					break
-		streamurl = tmpstr
+		# streamurl = tmpstr
+
 	verboseprint('stream url: ' + streamurl)
 	target_dir = os.path.expandvars(settings['GLOBAL']['target_dir'])
 	stoprec = threading.Event()
