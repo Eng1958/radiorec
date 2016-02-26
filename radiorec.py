@@ -39,6 +39,9 @@ def check_duration(value):
 	else:
 		return value
 
+# -----------------------------------------------------------
+#
+# -----------------------------------------------------------
 def read_settings():
 	settings_base_dir = ''
 	if sys.platform.startswith('linux'):
@@ -67,7 +70,8 @@ def record_worker(stoprec, streamurl, target_dir, args):
 		filename += '_' + args.name
 	description = filename + '.txt'
 	fo = open(description, "w")
-	fo.write('Recording time: ' + cur_dt_string)
+	fo.write('Recording time: ' + cur_dt_string + '\n\n')
+	fo.write('Radiostation: ' + args.station + '\n')
 
 	verboseprint(streamurl)
 	# now, with the below headers, we defined ourselves as a simpleton who is
@@ -81,7 +85,6 @@ def record_worker(stoprec, streamurl, target_dir, args):
 
 
 	
-##	conn = urllib.request.urlopen(streamurl)
 	content_type = conn.getheader('Content-Type')
 	if(content_type == 'audio/mpeg'):
 		filename += '.mp3'
@@ -95,8 +98,9 @@ def record_worker(stoprec, streamurl, target_dir, args):
 		filename += '.mp3'
 	verboseprint('Write stream to ' + filename)
 	verboseprint(conn.info())
+	fo.write("========== Connection-Info ==============\n")
 	fo.write(str(conn.info()))
-##	print(conn.geturl());
+
 	verboseprint('HTTP status code: ' + str(conn.getcode()));
 
 	metaint = conn.getheader('icy-metaint')
@@ -109,11 +113,15 @@ def record_worker(stoprec, streamurl, target_dir, args):
 			os.chmod(filename, stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP | stat.S_IWGRP |
 					 stat.S_IROTH | stat.S_IWOTH)
 		verboseprint('Recording ' + args.station + '...')
+		fo.close()
 		while(not stoprec.is_set() and not conn.closed):
 			# read stream from URL and write to file
 			## target.write(conn.read(1024))
 			target.write(conn.read(read_length))
 
+# -----------------------------------------------------------
+#
+# -----------------------------------------------------------
 def record(args):
 	settings = read_settings()
 	streamurl = ''
@@ -146,7 +154,6 @@ def record(args):
 					streamurl = linestr
 					print("[" + streamurl.replace('\n','') + "]")
 					break
-		# streamurl = tmpstr
 
 	verboseprint('stream url: ' + streamurl)
 	target_dir = os.path.expandvars(settings['GLOBAL']['target_dir'])
